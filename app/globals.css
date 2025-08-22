@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-playfair: var(--font-playfair);
+    --font-inter: var(--font-inter);
+
+    --background: #ffffff;
+    --foreground: #4b5563;
+    --card: #fffbeb;
+    --card-foreground: #4b5563;
+    --popover: #ffffff;
+    --popover-foreground: #4b5563;
+    --primary: #ea580c;
+    --primary-foreground: #ffffff;
+    --secondary: #f97316;
+    --secondary-foreground: #ffffff;
+    --muted: #f8fafc;
+    --muted-foreground: #4b5563;
+    --accent: #f97316;
+    --accent-foreground: #ffffff;
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --border: #e5e7eb;
+    --input: #f8fafc;
+    --ring: rgba(234, 88, 12, 0.5);
+    --chart-1: #ea580c;
+    --chart-2: #f97316;
+    --chart-3: #f59e0b;
+    --chart-4: #dc2626;
+    --chart-5: #374151;
+    --radius: 0.5rem;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #4b5563;
+    --sidebar-primary: #ea580c;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f97316;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #e5e7eb;
+    --sidebar-ring: rgba(234, 88, 12, 0.5);
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  .font-playfair {
+    font-family: var(--font-playfair);
+  }
+
+  .font-inter {
+    font-family: var(--font-inter);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-playfair);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Loading animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Carousel animations */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 30s linear infinite;
+}
+
+.animate-scroll:hover {
+  animation-play-state: paused;
+}
