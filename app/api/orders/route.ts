@@ -1,16 +1,19 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-
-const supabase = createClient()
+import { type NextRequest, NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { customer_name, customer_email, customer_phone, customer_address, delivery_method, items, total } = body
+    const supabase = createServerSupabaseClient();
+    const body = await request.json();
 
-    const orderNumber = `ORD-${Date.now()}`
+    const { customer_name, customer_email, customer_phone, customer_address, delivery_method, items, total } = body;
 
-    // Create the order with all customer information
+    if (!customer_name || !customer_email || !items || !total) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const orderNumber = `ORD-${Date.now()}`;
+
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
@@ -20,54 +23,47 @@ export async function POST(request: NextRequest) {
         customer_phone,
         customer_address,
         delivery_method,
-        items: JSON.stringify(items),
+        items, // JSONB column
         total,
         status: "pending",
       })
       .select()
-      .single()
+      .single();
 
     if (orderError) {
-      console.error("Error creating order:", orderError)
-      return NextResponse.json({ error: "Error al crear el pedido" }, { status: 500 })
+      console.error("Error creating order:", orderError);
+      return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
     }
 
-    try {
-      const notificationResponse = await fetch(`${request.nextUrl.origin}/api/send-notification`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+    // Fire-and-forget notification (non-blocking)
+    fetch(`${request.nextUrl.origin}/api/send-notification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId: order.id,
+        customerInfo: {
+          name: customer_name,
+          email: customer_email,
+          phone: customer_phone,
+          address: customer_address,
+          deliveryMethod: delivery_method,
         },
-        body: JSON.stringify({
-          orderId: order.id,
-          customerInfo: {
-            name: customer_name,
-            email: customer_email,
-            phone: customer_phone,
-            address: customer_address,
-            deliveryMethod: delivery_method,
-          },
-          items,
-          total,
-        }),
-      })
+        items,
+        total,
+      }),
+    }).catch((err) => console.error("Error sending notification:", err));
 
-      if (!notificationResponse.ok) {
-        console.error("Failed to send notification")
-      }
-    } catch (notificationError) {
-      console.error("Error sending notification:", notificationError)
-    }
-
-    return NextResponse.json(order)
-  } catch (error) {
-    console.error("Error processing order:", error)
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
+    return NextResponse.json(order, { status: 201 });
+  } catch (err) {
+    console.error("Orders POST error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function GET() {
   try {
+    const supabase = createServerSupabaseClient();
+
     const { data: orders, error } = await supabase
       .from("orders")
       .select(`
@@ -80,16 +76,16 @@ export async function GET() {
           subtotal
         )
       `)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching orders:", error)
-      return NextResponse.json({ error: "Error al obtener pedidos" }, { status: 500 })
+      console.error("Error fetching orders:", error);
+      return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
     }
 
-    return NextResponse.json(orders)
-  } catch (error) {
-    console.error("Error fetching orders:", error)
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
+    return NextResponse.json(orders);
+  } catch (err) {
+    console.error("Orders GET error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

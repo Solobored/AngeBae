@@ -1,60 +1,31 @@
-import { createClient } from "@/lib/supabase/server"
-import { type NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { type NextRequest, NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData()
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
+    const supabase = createServerSupabaseClient();
+    const body = await request.json();
+    const { email, password } = body;
 
     if (!email || !password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
+      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     }
 
-    const supabase = createClient()
+    // Attempt to authenticate admin
+    const { data, error } = await supabase
+      .from("admin_users")
+      .select("*")
+      .eq("email", email)
+      .eq("password", password) // Assuming you store plain password (not recommended!)
+      .single();
 
-    // First, try to sign in with existing user
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      // If user doesn't exist and it's the default admin, create the user
-      if (email === "admin@skincarepro.com" && password === "admin123") {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost:3000"}/admin`,
-          },
-        })
-
-        if (signUpError) {
-          return NextResponse.json({ error: signUpError.message }, { status: 400 })
-        }
-
-        // Try to sign in again after creating the user
-        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (loginError) {
-          return NextResponse.json({ error: loginError.message }, { status: 400 })
-        }
-      } else {
-        return NextResponse.json({ error: error.message }, { status: 400 })
-      }
+    if (error || !data) {
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const cookieStore = cookies()
-    const response = NextResponse.redirect(new URL("/admin", request.url))
-
-    return response
-  } catch (error) {
-    console.error("Admin login error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ admin: data });
+  } catch (err) {
+    console.error("Admin login error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

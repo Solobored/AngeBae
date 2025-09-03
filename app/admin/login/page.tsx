@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
@@ -17,16 +16,28 @@ export default function AdminLoginPage() {
     setLoading(true)
     setError("")
 
-    // Simple hardcoded authentication
-    if (email === "admin@skincarepro.com" && password === "admin123") {
-      // Set authentication cookie
-      document.cookie = "admin_auth=true; path=/; max-age=86400" // 24 hours
-      router.push("/admin")
-    } else {
-      setError("Credenciales incorrectas")
-    }
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
 
-    setLoading(false)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || "Credenciales incorrectas")
+      } else {
+        // Set a simple authentication cookie for the session (optional)
+        document.cookie = "admin_auth=true; path=/; max-age=86400"
+        router.push("/admin")
+      }
+    } catch (err) {
+      console.error(err)
+      setError("Error de servidor, inténtalo más tarde")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -63,7 +74,7 @@ export default function AdminLoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-pink-500 focus:outline-none focus:ring-pink-500"
-              placeholder="admin123"
+              placeholder="Contraseña"
               required
             />
           </div>

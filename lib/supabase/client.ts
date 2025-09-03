@@ -1,12 +1,11 @@
-"use client";
-
-import { createBrowserClient } from "@supabase/ssr";
+// lib/supabase/client.ts
+import { createClient } from "@supabase/supabase-js";
 
 /**
- * Client-side Supabase instance for client components.
- * Uses public env vars (NEXT_PUBLIC_*) and stores the session in cookies.
+ * Supabase client for browser usage
+ * Uses the anon key (safe for client-side)
  */
-export const supabaseClient = createBrowserClient(
+export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
