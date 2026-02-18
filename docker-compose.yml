@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: angebae_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-angebae_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-angebae_password}
+      POSTGRES_DB: ${POSTGRES_DB:-angebae_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-angebae_user}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - angebae_network
+
+  # Redis for job queue
+  redis:
+    image: redis:7-alpine
+    container_name: angebae_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+    networks:
+      - angebae_network
+
+  # MinIO S3-compatible storage
+  minio:
+    image: minio/minio:latest
+    container_name: angebae_minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/minio_data
+    command: server /minio_data --console-address ":9001"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - angebae_network
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: angebae_mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - angebae_network
+
+  # Backend (Next.js server)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: angebae_backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-angebae_user}:${POSTGRES_PASSWORD:-angebae_password}@postgres:5432/${POSTGRES_DB:-angebae_db}
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-angebae-media}
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+      USE_LOCAL_DB: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - angebae_network
+    command: npm run dev
+
+  # Python OCR Worker (Celery)
+  ocr-worker:
+    build:
+      context: ./workers/ocr
+      dockerfile: Dockerfile
+    container_name: angebae_ocr_worker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-angebae_user}:${POSTGRES_PASSWORD:-angebae_password}@postgres:5432/${POSTGRES_DB:-angebae_db}
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-angebae-media}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./workers/ocr:/app
+    networks:
+      - angebae_network
+    command: celery -A tasks worker --loglevel=info
+
+  # PgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: angebae_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - angebae_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  pgadmin_data:
+
+networks:
+  angebae_network:
+    driver: bridge

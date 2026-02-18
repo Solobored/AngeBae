@@ -1,0 +1,83 @@
+/**
+ * POST /api/ocr/enqueue
+ * Enqueue a media file for OCR processing
+ * 
+ * Request body:
+ *  - mediaId: UUID of the media file
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { insert, querySingle } from "@/lib/db";
+import { enqueueOCRJob } from "@/lib/jobs";
+import { getPresignedUrl } from "@/lib/minio";
+import { v4 as uuidv4 } from "uuid";
+
+export async function POST(request: NextRequest) {
+  try {
+    // Check admin authentication
+    const token = request.cookies.get("admin_auth")?.value;
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { mediaId } = body;
+
+    if (!mediaId) {
+      return NextResponse.json({ error: "mediaId is required" }, { status: 400 });
+    }
+
+    // Check if media exists
+    const media = await querySingle(
+      "SELECT id, type, minio_key FROM media WHERE id = $1",
+      [mediaId]
+    );
+
+    if (!media) {
+      return NextResponse.json({ error: "Media not found" }, { status: 404 });
+    }
+
+    if (media.type !== "pdf") {
+      return NextResponse.json(
+        { error: "Only PDF files can be processed with OCR" },
+        { status: 400 }
+      );
+    }
+
+    // Create OCR job record
+    const ocrJobId = uuidv4();
+    const ocrJob = await insert("ocr_jobs", {
+      id: ocrJobId,
+      source_media_id: mediaId,
+      status: "pending",
+      created_at: new Date(),
+    });
+
+    // Get presigned URL for the file
+    const bucket = process.env.MINIO_BUCKET || "angebae-media";
+    const fileUrl = await getPresignedUrl(bucket, media.minio_key, 3600);
+
+    // Enqueue job to Redis/Celery
+    const job = await enqueueOCRJob(mediaId, ocrJobId, fileUrl, "pdf");
+
+    return NextResponse.json(
+      {
+        success: true,
+        ocrJob: {
+          id: ocrJobId,
+          status: "pending",
+          mediaId,
+          jobQueueId: job.id,
+          createdAt: new Date(),
+        },
+      },
+      { status: 201 }
+    );
+  } catch (err) {
+    console.error("OCR enqueue error:", err);
+    return NextResponse.json(
+      { error: "Failed to enqueue OCR job" },
+      { status: 500 }
+    );
+  }
+}

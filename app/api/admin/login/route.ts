@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { querySingle } from "@/lib/db";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
     const body = await request.json();
     const { email, password } = body;
 
@@ -15,28 +15,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch admin by email
-    const { data, error } = await supabase
-      .from("admins") // your table name
-      .select("*")
-      .eq("email", email)
-      .single();
+    // Fetch admin from PostgreSQL
+    const admin = await querySingle(
+      "SELECT id, email, password, name, active FROM admins WHERE email = $1",
+      [email]
+    );
 
-    if (error || !data) {
+    if (!admin) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
+    // Check if admin is active
+    if (!admin.active) {
+      return NextResponse.json({ error: "Admin account is inactive" }, { status: 401 });
+    }
+
     // Compare password
-    const isValid = await bcrypt.compare(password, data.password);
+    const isValid = await bcrypt.compare(password, admin.password);
 
     if (!isValid) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    // Remove password before returning
-    const { password: _, ...adminInfo } = data;
+    // Generate JWT token
+    const token = jwt.sign(
+      { adminId: admin.id, email: admin.email },
+      process.env.JWT_SECRET || "your-secret-key",
+      { expiresIn: "24h" }
+    );
 
-    return NextResponse.json({ admin: adminInfo });
+    // Remove password before returning
+    const { password: _, ...adminInfo } = admin;
+
+    // Set secure httpOnly cookie
+    const response = NextResponse.json({ 
+      admin: adminInfo,
+      token 
+    });
+    
+    response.cookies.set({
+      name: "admin_auth",
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 86400, // 24 hours
+    });
+
+    return response;
   } catch (err) {
     console.error("Admin login error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
