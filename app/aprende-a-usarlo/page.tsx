@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Search, Play, Clock, Eye, ArrowLeft, BookOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,6 +9,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 import Link from "next/link"
+import { useUserAuth } from "@/app/user-auth-context"
 
 interface Video {
   id: string
@@ -33,11 +35,21 @@ const categories = [
 ]
 
 export default function LearnHowToUsePage() {
+  const router = useRouter()
+  const { isAuthenticated, loading: authLoading } = useUserAuth()
+
   const [videos, setVideos] = useState<Video[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [filteredVideos, setFilteredVideos] = useState<Video[]>([])
+
+  // Check authentication
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/account/login")
+    }
+  }, [isAuthenticated, authLoading, router])
 
   useEffect(() => {
     fetchVideos()
@@ -98,6 +110,43 @@ export default function LearnHowToUsePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white">
+      {/* Auth Guard - Show loading while checking authentication */}
+      {authLoading ? (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-pink-50 to-white">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Verificando acceso...</p>
+          </div>
+        </div>
+      ) : !isAuthenticated ? (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-pink-50 to-white">
+          <div className="text-center max-w-md">
+            <BookOpen className="h-16 w-16 text-pink-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Acceso Requerido</h2>
+            <p className="text-gray-600 mb-6">
+              Debes iniciar sesión para acceder a la sección "Aprende a usarlo" y ver todos nuestros tutoriales.
+            </p>
+            <div className="flex flex-col gap-3">
+              <Link href="/account/login" className="w-full">
+                <Button className="w-full bg-gradient-to-r from-pink-600 to-purple-600">
+                  Iniciar Sesión
+                </Button>
+              </Link>
+              <Link href="/account/signup" className="w-full">
+                <Button variant="outline" className="w-full">
+                  Crear Cuenta
+                </Button>
+              </Link>
+              <Link href="/">
+                <Button variant="ghost" className="w-full">
+                  Volver a la Tienda
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Header - Updated to match main site design */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -343,6 +392,7 @@ export default function LearnHowToUsePage() {
           </div>
         </div>
       </footer>
-    </div>
+        </>
+      )}    </div>
   )
 }

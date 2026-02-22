@@ -157,3 +157,31 @@ export function isProvidersFeatureEnabled(): boolean {
   const flag = process.env.FEATURE_PROVIDERS
   return flag === undefined || flag === null || flag.toLowerCase() === "true"
 }
+// User auth helpers (for buyers/customers)
+export interface UserTokenPayload extends JwtPayload {
+  id: string
+  email: string
+  type: "user"
+}
+
+export function generateToken(payload: { id: string; email: string; type: "user" }): string {
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: "7d" })
+}
+
+export function verifyTokenWithType(token: string, type: string): UserTokenPayload | null {
+  try {
+    const decoded = jwt.verify(token, getJwtSecret())
+    if (
+      typeof decoded === "object" &&
+      decoded !== null &&
+      (decoded as UserTokenPayload).type === type &&
+      typeof (decoded as UserTokenPayload).id === "string" &&
+      typeof (decoded as UserTokenPayload).email === "string"
+    ) {
+      return decoded as UserTokenPayload
+    }
+    return null
+  } catch {
+    return null
+  }
+}
