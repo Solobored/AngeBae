@@ -736,6 +736,47 @@ Before production deployment:
 
 This project is part of the Angebae platform.
 
+## Providers (multi-tenant)
+
+- Migration: `npm run migrate` (adds users, providers, provider_users, brand_settings, provider_id columns on products/media/ocr_jobs/product_candidates).
+- Feature flag: `FEATURE_PROVIDERS=true` (default). Set false to disable provider endpoints.
+- Seed example: `npm run seed:provider` (creates user angebae.provider@local / Provider@123456 and provider slug angebae).
+
+### Auth
+- Provider signup: `POST /api/providers/signup`
+```bash
+curl -X POST http://localhost:3000/api/providers/signup \
+  -H "Content-Type: application/json" \
+  -d '{"name":"AngeBae","email":"angebae.provider@local","password":"Provider@123456","contact_info":{"phone":"+56 9 1234-5678"}}'
+```
+- Provider login: `POST /api/providers/login` (returns provider_auth cookie and token with scope provider:{id}).
+- Provider logout: `POST /api/providers/logout` (clears cookie).
+
+### Public
+- `GET /api/providers/by-slug/{slug}` → provider info + brand_settings + featured_products.
+
+### Settings (owner)
+- `PUT /api/providers/{id}/settings`
+```bash
+curl -X PUT http://localhost:3000/api/providers/<providerId>/settings \
+  -H "Content-Type: application/json" \
+  --cookie "provider_auth=..." \
+  -d '{"name":"AngeBae","logo_url":"https://.../logo.png","brand":{"site_title":"AngeBae","subtitle":"Parte de Beauty Therapist"}}'
+```
+
+### Products (scoped)
+- `POST /api/providers/{id}/products` (owner/manager or admin) – same payload as admin product creation, auto-sets provider_id.
+- `GET /api/products?providerId=<id>` filters by provider.
+
+### Media & OCR (scoped)
+- `POST /api/media/upload` now accepts provider_auth; stores media.provider_id; rejects cross-provider product ids.
+- `POST /api/ocr/enqueue` accepts {mediaId, provider_id}; stores ocr_jobs.provider_id and enqueues with provider context.
+- `GET /api/ocr/jobs/{id}` scoped to provider_id unless admin.
+- `GET /api/providers/{id}/product_candidates` returns OCR candidates for that provider.
+
+### Acceptance script
+Run `./scripts/acceptance_providers.sh` after services are up to smoke-test signup, login, upload, OCR enqueue, and public provider endpoint.
+
 ## 🤝 Support
 
 For issues or questions, check the logs:

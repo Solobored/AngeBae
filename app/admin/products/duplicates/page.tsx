@@ -10,9 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useAdminAuth } from "../../providers"
 
 interface Product {
-  id: number
+  id: string
   name: string
   price: number
   slug: string
@@ -27,6 +28,7 @@ interface DuplicateGroup {
 
 export default function DuplicatesPage() {
   const router = useRouter()
+  const { isAuthenticated, loading: authLoading } = useAdminAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,14 +38,16 @@ export default function DuplicatesPage() {
   const [similarityThreshold, setSimilarityThreshold] = useState(80)
 
   useEffect(() => {
-    // Check authentication
-    const adminAuth = document.cookie.includes("admin_auth=true")
-    if (!adminAuth) {
+    if (!authLoading && !isAuthenticated) {
       router.push("/admin/login")
-      return
     }
-    fetchProducts()
-  }, [router])
+  }, [authLoading, isAuthenticated, router])
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      fetchProducts()
+    }
+  }, [authLoading, isAuthenticated])
 
   const fetchProducts = async () => {
     try {
@@ -103,7 +107,7 @@ export default function DuplicatesPage() {
     }
   }
 
-  const mergeProducts = async (keepProductId: number, removeProductIds: number[]) => {
+  const mergeProducts = async (keepProductId: string, removeProductIds: string[]) => {
     try {
       const response = await fetch("/api/products/merge", {
         method: "POST",
@@ -134,7 +138,7 @@ export default function DuplicatesPage() {
     return "text-yellow-600"
   }
 
-  if (loading) {
+  if (authLoading || !isAuthenticated || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-lg">Cargando productos...</div>

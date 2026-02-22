@@ -10,7 +10,6 @@ import tempfile
 from io import BytesIO
 
 import fitz  # PyMuPDF
-import pytesseract
 from PIL import Image
 from celery import Celery, Task
 from minio import Minio
@@ -103,23 +102,10 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
                 'images': [],
             }
             
-            # Try to extract text directly first
+            # Extract text directly from PDF using PyMuPDF
             text = page.get_text()
             page_data['text'] = text
-            
-            # If no text, perform OCR on images
-            image_list = page.get_images(full=True)
-            if not text or len(text.strip()) < 50:
-                # Convert page to image and OCR
-                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better OCR
-                img_data = pix.tobytes("ppm")
-                img = Image.open(BytesIO(img_data))
-                
-                ocr_text = pytesseract.image_to_string(img, lang='spa+eng')
-                page_data['ocr_text'] = ocr_text
-                
-                if not text:
-                    page_data['text'] = ocr_text
+            page_data['ocr_text'] = text  # Use extracted text as OCR result
             
             pages_data.append(page_data)
         
@@ -210,15 +196,15 @@ def update_ocr_job_status(conn, job_id: str, status: str, result: dict = None, e
     cursor.close()
 
 
-def insert_product_candidates(conn, ocr_job_id: str, candidates: List[Dict]):
+def insert_product_candidates(conn, ocr_job_id: str, candidates: List[Dict], provider_id: str = None):
     """Insert product candidates into database"""
     cursor = conn.cursor()
     
     for candidate in candidates:
         query = """
             INSERT INTO product_candidates 
-            (id, ocr_job_id, raw_json, confidence, extracted_title, extracted_price, extracted_sku)
-            VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s)
+            (id, ocr_job_id, raw_json, confidence, extracted_title, extracted_price, extracted_sku, provider_id)
+            VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s)
         """
         
         values = (
@@ -228,6 +214,7 @@ def insert_product_candidates(conn, ocr_job_id: str, candidates: List[Dict]):
             candidate.get('title', ''),
             candidate.get('price'),
             candidate.get('sku'),
+            provider_id,
         )
         
         cursor.execute(query, values)
@@ -237,7 +224,7 @@ def insert_product_candidates(conn, ocr_job_id: str, candidates: List[Dict]):
 
 
 @app.task(bind=True)
-def process_ocr_job(self, media_id: str, ocr_job_id: str, file_url: str, file_type: str = 'pdf'):
+def process_ocr_job(self, media_id: str, ocr_job_id: str, file_url: str, file_type: str = 'pdf', provider_id: str = None):
     """
     Main OCR processing task
     
@@ -252,6 +239,14 @@ def process_ocr_job(self, media_id: str, ocr_job_id: str, file_url: str, file_ty
         
         # Get database connection
         conn = self.get_db_connection()
+
+        # Load provider_id from DB if not passed
+        if provider_id is None:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SELECT provider_id FROM ocr_jobs WHERE id = %s", (ocr_job_id,))
+            job_row = cursor.fetchone()
+            cursor.close()
+            provider_id = job_row.get("provider_id") if job_row else None
         
         # Update job status to processing
         update_ocr_job_status(conn, ocr_job_id, 'processing')
@@ -293,7 +288,7 @@ def process_ocr_job(self, media_id: str, ocr_job_id: str, file_url: str, file_ty
         
         # Save candidates to database
         if all_candidates:
-            insert_product_candidates(conn, ocr_job_id, all_candidates)
+            insert_product_candidates(conn, ocr_job_id, all_candidates, provider_id)
         
         # Update job result
         result = {

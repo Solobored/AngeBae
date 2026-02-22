@@ -3,7 +3,7 @@
  * Handles file uploads, downloads, and presigned URLs
  */
 
-import { Client as MinIOClient } from '@minio/minio';
+import { Client as MinIOClient } from 'minio';
 
 let minioClient: MinIOClient | null = null;
 

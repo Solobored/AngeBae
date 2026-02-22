@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useAdminAuth } from "../providers"
 
 interface Order {
-  id: number
+  id: string
   customer_name: string
   customer_email: string
   customer_phone: string
@@ -27,6 +28,7 @@ interface Order {
 
 export default function OrdersPage() {
   const router = useRouter()
+  const { isAuthenticated, loading: authLoading } = useAdminAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -36,14 +38,16 @@ export default function OrdersPage() {
   const [sendingEmail, setSendingEmail] = useState(false)
 
   useEffect(() => {
-    // Check authentication
-    const adminAuth = document.cookie.includes("admin_auth=true")
-    if (!adminAuth) {
+    if (!authLoading && !isAuthenticated) {
       router.push("/admin/login")
-      return
     }
-    fetchOrders()
-  }, [router])
+  }, [authLoading, isAuthenticated, router])
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      fetchOrders()
+    }
+  }, [authLoading, isAuthenticated])
 
   const fetchOrders = async () => {
     try {
@@ -63,7 +67,7 @@ export default function OrdersPage() {
     }
   }
 
-  const updateOrderStatus = async (orderId: number, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
       const response = await fetch(`/api/orders/${orderId}`, {
         method: "PUT",
@@ -144,7 +148,7 @@ export default function OrdersPage() {
     })
   }
 
-  if (loading) {
+  if (authLoading || !isAuthenticated || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-lg">Cargando pedidos...</div>

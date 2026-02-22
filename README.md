@@ -33,6 +33,13 @@
 - ✅ Confidence scoring
 - ✅ Markup review and approval workflow (endpoints only)
 
+### Providers (multi-tenant)
+- ✅ Provider accounts (signup/login) with JWT scope provider:{id}
+- ✅ Micro-tienda branding (logo, favicon, theme, site title)
+- ✅ Provider-scoped products, media uploads, and OCR jobs
+- ✅ Public provider page: `GET /api/providers/by-slug/:slug`
+- ✅ Seed script: `npm run seed:provider`
+
 ### Order Management
 - ✅ Order creation with customer data (JSONB)
 - ✅ Shopping cart
@@ -463,6 +470,7 @@ When adding new backend features:
 3. Add tests for new endpoints
 4. Document in [BACKEND.md](./BACKEND.md)
 5. Update this README if needed
+6. Keep footer credit “Desarrollado por Josvaneiba” (link /about/dev) intact
 
 ## 📞 Support
 

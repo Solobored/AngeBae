@@ -11,6 +11,7 @@ import { ArrowLeft, Upload, FileText, Eye } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useAdminAuth } from "../providers"
 
 interface ExtractedProduct {
   name: string
@@ -32,6 +33,7 @@ interface ProcessingResult {
 
 export default function CatalogPage() {
   const router = useRouter()
+  const { isAuthenticated, loading: authLoading } = useAdminAuth()
   const [uploading, setUploading] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
@@ -41,14 +43,16 @@ export default function CatalogPage() {
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    // Check authentication
-    const adminAuth = document.cookie.includes("admin_auth=true")
-    if (!adminAuth) {
+    if (!authLoading && !isAuthenticated) {
       router.push("/admin/login")
-      return
     }
-    fetchProcessingHistory()
-  }, [router])
+  }, [authLoading, isAuthenticated, router])
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      fetchProcessingHistory()
+    }
+  }, [authLoading, isAuthenticated])
 
   const fetchProcessingHistory = async () => {
     try {
@@ -187,6 +191,14 @@ export default function CatalogPage() {
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.processing
     return <Badge variant={config.variant}>{config.label}</Badge>
+  }
+
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-lg">Cargando...</div>
+      </div>
+    )
   }
 
   return (

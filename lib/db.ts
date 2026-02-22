@@ -28,7 +28,7 @@ export function getPool(): pg.Pool {
       connectionTimeoutMillis: 2000,
     });
 
-    pool.on('error', (err) => {
+    pool.on('error', (err: unknown) => {
       console.error('Unexpected error on idle client', err);
     });
   }

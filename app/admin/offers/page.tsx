@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
+import { useAdminAuth } from "../providers"
 
 interface Offer {
-  id: number
-  product_id: number
+  id: string
+  product_id: string
   product_name: string
   product_image: string
   original_price: number
@@ -27,17 +28,19 @@ export default function OffersManagementPage() {
   const [offers, setOffers] = useState<Offer[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const { isAuthenticated, loading: authLoading } = useAdminAuth()
 
   useEffect(() => {
-    // Check authentication
-    const adminAuth = document.cookie.includes("admin_auth=true")
-    if (!adminAuth) {
+    if (!authLoading && !isAuthenticated) {
       router.push("/admin/login")
-      return
     }
+  }, [authLoading, isAuthenticated, router])
 
-    fetchOffers()
-  }, [router])
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      fetchOffers()
+    }
+  }, [authLoading, isAuthenticated])
 
   const fetchOffers = async () => {
     try {
@@ -51,7 +54,7 @@ export default function OffersManagementPage() {
     }
   }
 
-  const toggleOfferStatus = async (offerId: number, currentStatus: boolean) => {
+  const toggleOfferStatus = async (offerId: string, currentStatus: boolean) => {
     try {
       const response = await fetch(`/api/offers/${offerId}`, {
         method: "PATCH",
@@ -67,7 +70,7 @@ export default function OffersManagementPage() {
     }
   }
 
-  const deleteOffer = async (offerId: number) => {
+  const deleteOffer = async (offerId: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar esta oferta?")) return
 
     try {
@@ -87,7 +90,7 @@ export default function OffersManagementPage() {
     return new Date(dateString).toLocaleDateString("es-ES")
   }
 
-  if (loading) {
+  if (authLoading || !isAuthenticated || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-lg">Cargando ofertas...</div>

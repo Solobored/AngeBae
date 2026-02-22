@@ -13,9 +13,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowLeft, X } from "lucide-react"
+import { useAdminAuth } from "../../providers"
 
 export default function AddProductPage() {
   const router = useRouter()
+  const { isAuthenticated, loading: authLoading } = useAdminAuth()
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
   const [error, setError] = useState("")
@@ -33,14 +35,16 @@ export default function AddProductPage() {
   })
 
   useEffect(() => {
-    // Check authentication
-    const adminAuth = document.cookie.includes("admin_auth=true")
-    if (!adminAuth) {
+    if (!authLoading && !isAuthenticated) {
       router.push("/admin/login")
-      return
     }
-    fetchCategories()
-  }, [router])
+  }, [authLoading, isAuthenticated, router])
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      fetchCategories()
+    }
+  }, [authLoading, isAuthenticated])
 
   const fetchCategories = async () => {
     try {
@@ -118,6 +122,14 @@ export default function AddProductPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-lg">Cargando...</div>
+      </div>
+    )
   }
 
   return (

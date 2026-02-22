@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useAdminAuth } from "../providers"
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("")
@@ -10,6 +11,13 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
+  const { isAuthenticated, loading: sessionLoading, refreshSession } = useAdminAuth()
+
+  useEffect(() => {
+    if (!sessionLoading && isAuthenticated) {
+      router.replace("/admin")
+    }
+  }, [isAuthenticated, router, sessionLoading])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,9 +36,9 @@ export default function AdminLoginPage() {
       if (!res.ok) {
         setError(data.error || "Credenciales incorrectas")
       } else {
-        // Set a simple authentication cookie for the session (optional)
-        document.cookie = "admin_auth=true; path=/; max-age=86400"
+        await refreshSession()
         router.push("/admin")
+        router.refresh()
       }
     } catch (err) {
       console.error(err)

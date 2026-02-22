@@ -13,16 +13,22 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { orderId, items, payer, back_urls } = body
+    const baseUrl = process.env.NEXTAUTH_URL || request.nextUrl.origin
+    const mappedItems = (items || []).map((item: any) => ({
+      id: String(item.id),
+      title: item.name,
+      description: item.description,
+      quantity: Number(item.quantity || 1),
+      unit_price: Number(item.price || 0),
+      currency_id: "CLP",
+    }))
+
+    if (mappedItems.length === 0) {
+      return NextResponse.json({ error: "No hay productos para pagar" }, { status: 400 })
+    }
 
     const preferenceData = {
-      items: items.map((item: any) => ({
-        id: item.id.toString(),
-        title: item.name,
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.price,
-        currency_id: "CLP", // Chilean Peso
-      })),
+      items: mappedItems,
       payer: {
         name: payer?.name || "Cliente",
         email: payer?.email || "cliente@example.com",
@@ -34,13 +40,13 @@ export async function POST(request: NextRequest) {
           : undefined,
       },
       back_urls: {
-        success: `${process.env.NEXTAUTH_URL}/checkout/success?orderId=${orderId}`,
-        failure: `${process.env.NEXTAUTH_URL}/checkout/failure?orderId=${orderId}`,
-        pending: `${process.env.NEXTAUTH_URL}/checkout/pending?orderId=${orderId}`,
+        success: `${baseUrl}/checkout/success?orderId=${orderId}`,
+        failure: `${baseUrl}/checkout/failure?orderId=${orderId}`,
+        pending: `${baseUrl}/checkout/pending?orderId=${orderId}`,
       },
       auto_return: "approved",
       external_reference: orderId.toString(),
-      notification_url: `${process.env.NEXTAUTH_URL}/api/mercadopago/webhook`,
+      notification_url: `${baseUrl}/api/mercadopago/webhook`,
       statement_descriptor: "SKINCARE PRO",
       expires: true,
       expiration_date_from: new Date().toISOString(),
@@ -63,6 +69,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const orderId = searchParams.get("orderId")
+  const baseUrl = process.env.NEXTAUTH_URL || request.nextUrl.origin
 
   if (!orderId) {
     return NextResponse.json({ error: "Order ID is required" }, { status: 400 })
@@ -70,23 +77,28 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get order from database
-    const orderResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/orders/${orderId}`)
+    const orderResponse = await fetch(`${baseUrl}/api/orders/${orderId}`)
 
     if (!orderResponse.ok) {
       throw new Error("Order not found")
     }
 
     const order = await orderResponse.json()
+    const mappedItems = (order.order_items || []).map((item: any, index: number) => ({
+      id: String(item.product_id || item.id || `${index + 1}`),
+      title: item.product_name || item.name || "Producto",
+      description: item.product_name || item.name || "Producto",
+      quantity: Number(item.quantity || 1),
+      unit_price: Number(item.product_price || item.price || 0),
+      currency_id: "CLP",
+    }))
+
+    if (mappedItems.length === 0) {
+      throw new Error("Order has no items")
+    }
 
     const preferenceData = {
-      items: order.order_items.map((item: any) => ({
-        id: item.product_id.toString(),
-        title: item.product_name,
-        description: item.product_name,
-        quantity: item.quantity,
-        unit_price: item.product_price,
-        currency_id: "CLP",
-      })),
+      items: mappedItems,
       payer: {
         name: "Cliente",
         email: order.customer_email || "cliente@example.com",
@@ -98,13 +110,13 @@ export async function GET(request: NextRequest) {
           : undefined,
       },
       back_urls: {
-        success: `${process.env.NEXTAUTH_URL}/checkout/success?orderId=${orderId}`,
-        failure: `${process.env.NEXTAUTH_URL}/checkout/failure?orderId=${orderId}`,
-        pending: `${process.env.NEXTAUTH_URL}/checkout/pending?orderId=${orderId}`,
+        success: `${baseUrl}/checkout/success?orderId=${orderId}`,
+        failure: `${baseUrl}/checkout/failure?orderId=${orderId}`,
+        pending: `${baseUrl}/checkout/pending?orderId=${orderId}`,
       },
       auto_return: "approved",
       external_reference: orderId.toString(),
-      notification_url: `${process.env.NEXTAUTH_URL}/api/mercadopago/webhook`,
+      notification_url: `${baseUrl}/api/mercadopago/webhook`,
     }
 
     const result = await preference.create({ body: preferenceData })
@@ -113,6 +125,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(result.sandbox_init_point || result.init_point!)
   } catch (error) {
     console.error("Error creating MercadoPago preference:", error)
-    return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/checkout/failure?orderId=${orderId}`)
+    return NextResponse.redirect(`${baseUrl}/checkout/failure?orderId=${orderId}`)
   }
 }

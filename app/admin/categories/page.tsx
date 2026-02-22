@@ -15,9 +15,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useAdminAuth } from "../providers"
 
 interface Category {
-  id: number
+  id: string
   name: string
   slug: string
   description?: string
@@ -27,14 +28,15 @@ interface Category {
 }
 
 interface Product {
-  id: number
+  id: string
   name: string
-  category_id?: number
+  category_id?: string
   price: number
 }
 
 export default function CategoriesPage() {
   const router = useRouter()
+  const { isAuthenticated, loading: authLoading } = useAdminAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,7 +45,7 @@ export default function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showMoveDialog, setShowMoveDialog] = useState(false)
-  const [selectedProducts, setSelectedProducts] = useState<number[]>([])
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([])
   const [targetCategoryId, setTargetCategoryId] = useState<string>("")
 
   const [formData, setFormData] = useState({
@@ -52,14 +54,16 @@ export default function CategoriesPage() {
   })
 
   useEffect(() => {
-    // Check authentication
-    const adminAuth = document.cookie.includes("admin_auth=true")
-    if (!adminAuth) {
+    if (!authLoading && !isAuthenticated) {
       router.push("/admin/login")
-      return
     }
-    fetchData()
-  }, [router])
+  }, [authLoading, isAuthenticated, router])
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      fetchData()
+    }
+  }, [authLoading, isAuthenticated])
 
   const fetchData = async () => {
     try {
@@ -165,7 +169,7 @@ export default function CategoriesPage() {
     setShowAddDialog(true)
   }
 
-  const handleDelete = async (categoryId: number) => {
+  const handleDelete = async (categoryId: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar esta categoría?")) {
       return
     }
@@ -200,7 +204,7 @@ export default function CategoriesPage() {
         },
         body: JSON.stringify({
           productIds: selectedProducts,
-          categoryId: Number.parseInt(targetCategoryId),
+          categoryId: targetCategoryId,
         }),
       })
 
@@ -218,7 +222,7 @@ export default function CategoriesPage() {
     }
   }
 
-  const getProductCountForCategory = (categoryId: number) => {
+  const getProductCountForCategory = (categoryId: string) => {
     return products.filter((product) => product.category_id === categoryId).length
   }
 
@@ -226,7 +230,7 @@ export default function CategoriesPage() {
     return products.filter((product) => !product.category_id)
   }
 
-  if (loading) {
+  if (authLoading || !isAuthenticated || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-lg">Cargando categorías...</div>

@@ -4,17 +4,16 @@ import { useState, useEffect } from "react"
 import { ShoppingCart, Star, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
-import Image from "next/image"
 import Link from "next/link"
 import { Header } from "@/src/components/layout/Header"
 import { CartSidebar } from "@/src/components/cart/CartSidebar"
 import { StickyFilters } from "@/src/components/filters/StickyFilters"
 import { DynamicOffersCarousel } from "@/src/components/offers/DynamicOffersCarousel"
+import { ProductCard, type ProductCardProduct } from "@/src/components/store/ProductCard"
 import { smartProductFilter } from "@/src/utils/smartSearch"
 
 // Datos de ejemplo - en producción vendrían de la base de datos
-const sampleProducts = [
+const sampleProducts: ProductCardProduct[] = [
   {
     id: 1,
     name: "Serum Vitamina C Antioxidante",
@@ -95,20 +94,48 @@ const categories = [
 ]
 
 export default function HomePage() {
-  const [products, setProducts] = useState(sampleProducts)
-  const [filteredProducts, setFilteredProducts] = useState(sampleProducts)
+  const [products, setProducts] = useState<ProductCardProduct[]>(sampleProducts)
+  const [filteredProducts, setFilteredProducts] = useState<ProductCardProduct[]>(sampleProducts)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("todos")
   const [sortBy, setSortBy] = useState("featured")
   const [cart, setCart] = useState<any[]>([])
   const [isSticky, setIsSticky] = useState(false)
   const [isCartOpen, setIsCartOpen] = useState(false) // Added cart sidebar state
+  const [brand, setBrand] = useState<{ logoUrl?: string; siteTitle?: string; subtitle?: string } | null>(null)
 
   useEffect(() => {
     const savedCart = localStorage.getItem("cart")
     if (savedCart) {
       setCart(JSON.parse(savedCart))
     }
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/products")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((apiProducts: any[]) => {
+        if (Array.isArray(apiProducts) && apiProducts.length > 0) {
+          const mapped: ProductCardProduct[] = apiProducts.map((p) => ({
+            id: p.id,
+            name: p.name,
+            price: Number(p.price) || 0,
+            originalPrice: p.original_price != null ? Number(p.original_price) : null,
+            image: p.image_url || null,
+            description: p.description || null,
+            category: p.category_id || undefined,
+            isFlashSale: p.is_flash_sale,
+            isBestSeller: p.is_best_seller,
+            rating: undefined,
+            reviews: undefined,
+            provider_slug: p.provider_slug ?? null,
+            provider_name: p.provider_name ?? null,
+          }))
+          setProducts(mapped)
+          setFilteredProducts(mapped)
+        }
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -122,6 +149,24 @@ export default function HomePage() {
 
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  useEffect(() => {
+    const slug = process.env.NEXT_PUBLIC_PROVIDER_SLUG || "angebae"
+    fetch(`/api/providers/by-slug/${slug}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.brand_settings) {
+          setBrand({
+            logoUrl: data.brand_settings.logo_url || data.logo_url || undefined,
+            siteTitle: data.brand_settings.site_title || data.name,
+            subtitle: data.brand_settings.subtitle || "Parte de Beauty Therapist",
+          })
+        }
+      })
+      .catch(() => {
+        // silent fallback
+      })
   }, [])
 
   useEffect(() => {
@@ -149,7 +194,7 @@ export default function HomePage() {
         filtered = [...filtered].sort((a, b) => b.rating - a.rating)
         break
       case "newest":
-        filtered = [...filtered].sort((a, b) => b.id - a.id)
+        filtered = [...filtered].sort((a, b) => String(b.id).localeCompare(String(a.id)))
         break
       default:
         // Featured - prioritize flash sales and best sellers
@@ -183,7 +228,7 @@ export default function HomePage() {
     updateCart(updatedCart)
   }
 
-  const updateQuantity = (id: number, quantity: number) => {
+  const updateQuantity = (id: string | number, quantity: number) => {
     if (quantity === 0) {
       removeFromCart(id)
       return
@@ -192,7 +237,7 @@ export default function HomePage() {
     updateCart(updatedCart)
   }
 
-  const removeFromCart = (id: number) => {
+  const removeFromCart = (id: string | number) => {
     const updatedCart = cart.filter((item) => item.id !== id)
     updateCart(updatedCart)
   }
@@ -203,7 +248,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white">
-      <Header searchTerm={searchTerm} onSearchChange={setSearchTerm} cartItemsCount={cartItemsCount} />
+      <Header searchTerm={searchTerm} onSearchChange={setSearchTerm} cartItemsCount={cartItemsCount} brand={brand ?? undefined} />
 
       {isSticky && (
         <StickyFilters
@@ -290,37 +335,7 @@ export default function HomePage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {bestSellerProducts.slice(0, 4).map((product) => (
-                <Card key={product.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-white">
-                  <CardHeader className="p-0">
-                    <div className="relative">
-                      <Image
-                        src={product.image || "/placeholder.svg"}
-                        alt={product.name}
-                        width={300}
-                        height={300}
-                        className="w-full h-48 object-cover rounded-t-lg"
-                      />
-                      <Badge className="absolute top-2 left-2 bg-green-500">BESTSELLER</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold mb-2 font-seatyio">{product.name}</h4>
-                    <p className="text-sm text-gray-600 mb-3 font-inter">{product.description}</p>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <span className="text-lg font-bold font-inter">${product.price}</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm font-inter">{product.rating}</span>
-                      <span className="text-sm text-gray-500 font-inter">({product.reviews})</span>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="p-4 pt-0">
-                    <Button onClick={() => addToCart(product)} className="w-full bg-green-600 hover:bg-green-700">
-                      Agregar al Carrito
-                    </Button>
-                  </CardFooter>
-                </Card>
+                <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
               ))}
             </div>
           </div>
@@ -349,57 +364,7 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProducts.map((product) => (
-              <Card key={product.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-white">
-                <CardHeader className="p-0">
-                  <div className="relative">
-                    <Image
-                      src={product.image || "/placeholder.svg"}
-                      alt={product.name}
-                      width={300}
-                      height={300}
-                      className="w-full h-48 object-cover rounded-t-lg"
-                    />
-                    {product.isFlashSale && <Badge className="absolute top-2 left-2 bg-red-500">OFERTA</Badge>}
-                    {product.isBestSeller && !product.isFlashSale && (
-                      <Badge className="absolute top-2 left-2 bg-green-500">BESTSELLER</Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <h4 className="font-semibold mb-2 font-seatyio">{product.name}</h4>
-                  <p className="text-sm text-gray-600 mb-3 font-inter">{product.description}</p>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <span className="text-lg font-bold font-inter">${product.price}</span>
-                    {product.originalPrice && (
-                      <span className="text-sm text-gray-500 line-through font-inter">${product.originalPrice}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="text-sm font-inter">{product.rating}</span>
-                    <span className="text-sm text-gray-500 font-inter">({product.reviews})</span>
-                  </div>
-                </CardContent>
-                <CardFooter className="p-4 pt-0 space-y-2">
-                  <div className="flex flex-col gap-3 w-full">
-                    <Link href={`/producto/${product.id}`} className="w-full">
-                      <Button
-                        variant="outline"
-                        className="w-full h-11 border-2 border-pink-600 text-pink-600 hover:bg-pink-50 font-medium text-sm bg-transparent transition-colors font-inter"
-                      >
-                        Ver Producto
-                      </Button>
-                    </Link>
-                    <Button
-                      onClick={() => addToCart(product)}
-                      className="w-full h-11 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-medium text-sm shadow-md transition-all font-inter"
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Agregar al Carrito
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
+              <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
             ))}
           </div>
 
@@ -435,8 +400,14 @@ export default function HomePage() {
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 angebae & beauty therapist. Todos los derechos reservados.</p>
+          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400 text-sm">
+            <p>
+              Desarrollado por{" "}
+              <Link href="/about/dev" className="underline hover:text-white">
+                Josvaneiba
+              </Link>
+            </p>
+            <p className="mt-1 text-gray-500">Parte de Beauty Therapist Platform</p>
           </div>
         </div>
       </footer>

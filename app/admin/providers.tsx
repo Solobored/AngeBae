@@ -1,152 +1,101 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 
-interface AuthContextType {
-  isAuthenticated: boolean
-  adminEmail: string | null
-  login: (email: string, password: string) => Promise<boolean>
-  logout: () => void
+interface AdminUser {
+  id: string
+  email: string
+  name: string | null
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+interface AuthContextValue {
+  admin: AdminUser | null
+  isAuthenticated: boolean
+  loading: boolean
+  refreshSession: () => Promise<void>
+  logout: () => Promise<void>
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [adminEmail, setAdminEmail] = useState<string | null>(null)
+  const [admin, setAdmin] = useState<AdminUser | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    // Check if user is already authenticated
-    const authStatus = localStorage.getItem("admin_auth")
-    const storedEmail = localStorage.getItem("admin_email")
-    if (authStatus === "true" && storedEmail) {
-      setIsAuthenticated(true)
-      setAdminEmail(storedEmail)
+  const refreshSession = useCallback(async () => {
+    try {
+      const response = await fetch("/api/admin/session", {
+        method: "GET",
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        setAdmin(null)
+        return
+      }
+
+      const data = await response.json()
+      if (data?.authenticated && data?.admin) {
+        setAdmin(data.admin)
+      } else {
+        setAdmin(null)
+      }
+    } catch {
+      setAdmin(null)
     }
   }, [])
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const logout = useCallback(async () => {
     try {
-      console.log("Attempting login with:", email)
-
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-      if (!supabaseUrl || !supabaseAnonKey) {
-        console.log("Supabase not configured, using hardcoded admin credentials")
-        // Fallback to hardcoded admin credentials when Supabase is not available
-        if (email === "admin@skincarepro.com" && password === "admin123") {
-          setIsAuthenticated(true)
-          setAdminEmail(email)
-          localStorage.setItem("admin_auth", "true")
-          localStorage.setItem("admin_email", email)
-          document.cookie = `admin_auth=true; path=/; max-age=86400; SameSite=Lax`
-          console.log("Login successful with hardcoded credentials")
-          return true
-        }
-        return false
-      }
-
-      const { createClient } = await import("@/lib/supabase/client")
-      const supabase = createClient()
-
-      const { data: tableCheck, error: tableError } = await supabase.from("admin_users").select("count").limit(1)
-
-      if (tableError) {
-        console.error("Table check error:", tableError)
-        // Fallback to hardcoded credentials if database is not accessible
-        if (email === "admin@skincarepro.com" && password === "admin123") {
-          setIsAuthenticated(true)
-          setAdminEmail(email)
-          localStorage.setItem("admin_auth", "true")
-          localStorage.setItem("admin_email", email)
-          document.cookie = `admin_auth=true; path=/; max-age=86400; SameSite=Lax`
-          return true
-        }
-        return false
-      }
-
-      const { data, error } = await supabase
-        .from("admin_users")
-        .select("*")
-        .eq("email", email)
-        .eq("password", password)
-        .single()
-
-      console.log("Supabase response:", { data, error })
-
-      if (error) {
-        console.error("Login error:", error)
-        if (error.code === "PGRST116") {
-          console.log("No admin user found, creating default admin...")
-          const { data: insertData, error: insertError } = await supabase
-            .from("admin_users")
-            .insert([
-              {
-                name: "Admin",
-                email: "admin@skincarepro.com",
-                password: "admin123",
-              },
-            ])
-            .select()
-            .single()
-
-          if (insertError) {
-            console.error("Error creating admin user:", insertError)
-            return false
-          }
-
-          // Try login again with the newly created user
-          if (email === "admin@skincarepro.com" && password === "admin123") {
-            setIsAuthenticated(true)
-            setAdminEmail(email)
-            localStorage.setItem("admin_auth", "true")
-            localStorage.setItem("admin_email", email)
-            document.cookie = `admin_auth=true; path=/; max-age=86400; SameSite=Lax`
-            console.log("Login successful with new admin user")
-            return true
-          }
-        }
-        return false
-      }
-
-      if (!data) {
-        console.log("No user data returned")
-        return false
-      }
-
-      setIsAuthenticated(true)
-      setAdminEmail(email)
-      localStorage.setItem("admin_auth", "true")
-      localStorage.setItem("admin_email", email)
-
-      document.cookie = `admin_auth=true; path=/; max-age=86400; SameSite=Lax`
-
-      console.log("Login successful, auth state set")
-      return true
-    } catch (error) {
-      console.error("Login error:", error)
-      return false
+      await fetch("/api/admin/logout", {
+        method: "POST",
+        credentials: "include",
+      })
+    } finally {
+      setAdmin(null)
     }
-  }
+  }, [])
 
-  const logout = () => {
-    setIsAuthenticated(false)
-    setAdminEmail(null)
-    localStorage.removeItem("admin_auth")
-    localStorage.removeItem("admin_email")
-    // Remove cookie
-    document.cookie = "admin_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-  }
+  useEffect(() => {
+    let active = true
 
-  return <AuthContext.Provider value={{ isAuthenticated, adminEmail, login, logout }}>{children}</AuthContext.Provider>
+    const run = async () => {
+      try {
+        await refreshSession()
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    run()
+
+    return () => {
+      active = false
+    }
+  }, [refreshSession])
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      admin,
+      isAuthenticated: Boolean(admin),
+      loading,
+      refreshSession,
+      logout,
+    }),
+    [admin, loading, refreshSession, logout],
+  )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export function useAuth() {
+export function useAdminAuth() {
   const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
+  if (!context) {
+    throw new Error("useAdminAuth must be used within AuthProvider")
   }
+
   return context
 }

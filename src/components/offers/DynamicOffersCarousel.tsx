@@ -14,8 +14,8 @@ import "swiper/css/navigation"
 import "swiper/css/pagination"
 
 interface Offer {
-  id: number
-  product_id: number
+  id: string
+  product_id: string
   product_name: string
   product_image: string
   product_description: string

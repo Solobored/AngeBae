@@ -2,30 +2,29 @@
 /**
  * Seed Admin User Script
  * Hashes password with bcrypt and inserts admin into PostgreSQL
- * 
+ *
  * Usage: node scripts/seedAdmin.js [email] [password]
  * Or uses ADMIN_EMAIL and ADMIN_PASSWORD from .env
  */
 
-import bcrypt from 'bcrypt';
-import pg from 'pg';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const bcrypt = require('bcrypt');
+const pg = require('pg');
+const dotenv = require('dotenv');
+const path = require('path');
 
 const { Client } = pg;
 
 // Load environment variables
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 dotenv.config({ path: path.join(__dirname, '..', '.env.example') });
 
 async function main() {
-  const email = process.argv[2] || process.env.ADMIN_EMAIL || 'admin@angebae.local';
-  const password = process.argv[3] || process.env.ADMIN_PASSWORD || 'admin123';
-  
+  const email = process.argv[2] || process.env.ADMIN_EMAIL || 'admin@angebae.com';
+  const password = process.argv[3] || process.env.ADMIN_PASSWORD || 'Admin@123456';
+
   const databaseUrl = process.env.DATABASE_URL;
-  
+
   if (!databaseUrl) {
     console.error('❌ DATABASE_URL environment variable is not set');
     process.exit(1);
@@ -46,10 +45,7 @@ async function main() {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Check if admin already exists
-    const existingAdmin = await client.query(
-      'SELECT id FROM admins WHERE email = $1',
-      [email]
-    );
+    const existingAdmin = await client.query('SELECT id FROM admins WHERE email = $1', [email]);
 
     if (existingAdmin.rows.length > 0) {
       // Update existing admin
@@ -84,7 +80,6 @@ async function main() {
     console.log(`   Email: ${email}`);
     console.log(`   Password: ${password}`);
     console.log('\n⚠️  Remember to change the password after first login!');
-
   } catch (err) {
     console.error('❌ Error:', err.message);
     process.exit(1);
@@ -93,7 +88,7 @@ async function main() {
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('❌ Fatal error:', err);
   process.exit(1);
 });

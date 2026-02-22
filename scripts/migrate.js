@@ -2,26 +2,25 @@
 /**
  * Database Migration Script
  * Runs SQL migration files from db/migrations/ directory
- * 
+ *
  * Usage: node scripts/migrate.js
  */
 
-import pg from 'pg';
-import fs from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
+const pg = require('pg');
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
 
 const { Client } = pg;
 
-// Load environment variables
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Load environment variables (.env first, then .env.local)
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 dotenv.config({ path: path.join(__dirname, '..', '.env.example') });
 
 async function runMigrations() {
   const databaseUrl = process.env.DATABASE_URL;
-  
+
   if (!databaseUrl) {
     console.error('❌ DATABASE_URL environment variable is not set');
     process.exit(1);
@@ -36,15 +35,16 @@ async function runMigrations() {
     await client.connect();
 
     const migrationsDir = path.join(__dirname, '..', 'db', 'migrations');
-    
+
     if (!fs.existsSync(migrationsDir)) {
       console.warn('⚠️  No migrations directory found');
       return;
     }
 
     // Get all migration files sorted
-    const files = fs.readdirSync(migrationsDir)
-      .filter(f => f.endsWith('.sql'))
+    const files = fs
+      .readdirSync(migrationsDir)
+      .filter((f) => f.endsWith('.sql'))
       .sort();
 
     if (files.length === 0) {
@@ -59,7 +59,7 @@ async function runMigrations() {
       const sql = fs.readFileSync(filePath, 'utf-8');
 
       console.log(`⏳ Running migration: ${file}`);
-      
+
       try {
         await client.query(sql);
         console.log(`✅ Completed: ${file}\n`);
@@ -71,7 +71,6 @@ async function runMigrations() {
     }
 
     console.log('✅ All migrations completed!');
-
   } catch (err) {
     console.error('❌ Migration error:', err.message);
     process.exit(1);
@@ -80,7 +79,7 @@ async function runMigrations() {
   }
 }
 
-runMigrations().catch(err => {
+runMigrations().catch((err) => {
   console.error('❌ Fatal error:', err);
   process.exit(1);
 });

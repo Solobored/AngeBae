@@ -20,14 +20,8 @@ export function getOCRQueue(): Queue.Queue {
         lockDuration: 30000,
         lockRenewTime: 15000,
         maxStalledCount: 2,
-        maxStalledInterval: 5000,
         stalledInterval: 5000,
         retryProcessDelay: 5000,
-        guardian: false,
-        retryProcessDelay: 5000,
-        guardianInterval: undefined,
-        dequeueConcurrency: undefined,
-        enableOfflineQueue: true,
       },
     });
 
@@ -55,7 +49,8 @@ export async function enqueueOCRJob(
   mediaid: string,
   ocrJobId: string,
   fileUrl: string,
-  fileType: string = 'pdf'
+  fileType: string = 'pdf',
+  providerId?: string
 ): Promise<Queue.Job> {
   const queue = getOCRQueue();
 
@@ -65,6 +60,7 @@ export async function enqueueOCRJob(
       ocrJobId,
       fileUrl,
       fileType,
+      providerId,
     },
     {
       attempts: 3,

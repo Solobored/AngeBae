@@ -8,7 +8,7 @@ import Image from "next/image"
 import Link from "next/link"
 
 interface CartItem {
-  id: number
+  id: string | number
   name: string
   price: number
   image: string
@@ -19,8 +19,8 @@ interface CartSidebarProps {
   isOpen: boolean
   onClose: () => void
   cart: CartItem[]
-  onUpdateQuantity: (id: number, quantity: number) => void
-  onRemoveItem: (id: number) => void
+  onUpdateQuantity: (id: string | number, quantity: number) => void
+  onRemoveItem: (id: string | number) => void
 }
 
 export function CartSidebar({ isOpen, onClose, cart, onUpdateQuantity, onRemoveItem }: CartSidebarProps) {

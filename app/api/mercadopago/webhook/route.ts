@@ -1,13 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { MercadoPagoConfig, Payment } from "mercadopago"
-import { createClient } from "@supabase/supabase-js"
+import { querySingle } from "@/lib/db"
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
 })
 
 const payment = new Payment(client)
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,49 +27,42 @@ export async function POST(request: NextRequest) {
         const orderId = paymentInfo.external_reference
         const status = paymentInfo.status
 
-        // Update order status in database
-        let orderStatus = "pending"
-        let paymentStatus = "pending"
+        if (orderId && isUuid(String(orderId))) {
+          let nextOrderStatus = "pending"
+          switch (status) {
+            case "approved":
+              nextOrderStatus = "processing"
+              break
+            case "rejected":
+            case "cancelled":
+              nextOrderStatus = "cancelled"
+              break
+            case "pending":
+            case "in_process":
+            default:
+              nextOrderStatus = "pending"
+              break
+          }
 
-        switch (status) {
-          case "approved":
-            orderStatus = "processing"
-            paymentStatus = "paid"
-            break
-          case "rejected":
-            orderStatus = "cancelled"
-            paymentStatus = "failed"
-            break
-          case "pending":
-            orderStatus = "pending"
-            paymentStatus = "pending"
-            break
-          case "in_process":
-            orderStatus = "pending"
-            paymentStatus = "pending"
-            break
-          case "cancelled":
-            orderStatus = "cancelled"
-            paymentStatus = "failed"
-            break
+          const updated = await querySingle<{ id: string }>(
+            `UPDATE orders
+             SET status = $1,
+                 payment_id = $2,
+                 payment_method = 'mercadopago',
+                 updated_at = NOW()
+             WHERE id = $3::uuid
+             RETURNING id::text AS id`,
+            [nextOrderStatus, String(paymentId), String(orderId)],
+          )
+
+          if (!updated) {
+            console.warn(`Webhook received but order not found: ${orderId}`)
+          } else {
+            console.log(`Order ${orderId} updated to ${nextOrderStatus}`)
+          }
+        } else if (orderId) {
+          console.warn(`Ignoring webhook with non-UUID external_reference: ${orderId}`)
         }
-
-        // Update order in database
-        const { error } = await supabase
-          .from("orders")
-          .update({
-            status: orderStatus,
-            payment_status: paymentStatus,
-            mercado_pago_id: paymentId.toString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", orderId)
-
-        if (error) {
-          console.error("Error updating order:", error)
-        }
-
-        console.log(`Order ${orderId} updated: ${orderStatus} - Payment: ${paymentStatus}`)
       }
     }
 

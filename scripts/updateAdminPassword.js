@@ -1,35 +1,40 @@
-import bcrypt from "bcrypt";
-import { createClient } from "@supabase/supabase-js";
-import dotenv from "dotenv";
+import pkg from 'pg';
+import bcrypt from 'bcrypt';
+import dotenv from 'dotenv';
 
+const { Pool } = pkg;
 dotenv.config();
 
-// Use your Supabase service role key
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://admin:admin123@localhost:5432/angebae',
+  ssl: process.env.DATABASE_SSL === 'true',
+});
 
 async function updateAdminPassword() {
   try {
-    const email = process.env.ADMIN_EMAIL || "admin@skincarepro.com";
-    const plainPassword = process.env.ADMIN_PASSWORD || "admin123";
+    const email = process.env.ADMIN_EMAIL || 'admin@angebae.com';
+    const plainPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
 
-    // Hash the password
+    // Hash the password (10 rounds)
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-    // Update the admin user in Supabase
-    const { data, error } = await supabase
-      .from("admins")
-      .update({ password: hashedPassword })
-      .eq("email", email);
+    // Update admin password in PostgreSQL
+    const result = await pool.query(
+      'UPDATE admins SET password = $1, updated_at = NOW() WHERE email = $2 RETURNING id, email',
+      [hashedPassword, email]
+    );
 
-    if (error) throw error;
+    if (result.rows.length === 0) {
+      console.error(`❌ Admin user with email ${email} not found`);
+      process.exit(1);
+    }
 
-    console.log("Admin password updated successfully:", data);
+    console.log(`✓ Admin password updated successfully for ${email}`);
+    await pool.end();
     process.exit(0);
   } catch (err) {
-    console.error("Error updating admin password:", err);
+    console.error('❌ Error updating admin password:', err.message);
+    await pool.end();
     process.exit(1);
   }
 }

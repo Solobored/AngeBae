@@ -4,15 +4,15 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json package-lock.json ./
 
-# Install pnpm and dependencies
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
+# Install dependencies
+RUN npm install --legacy-peer-deps
 
 COPY . .
 
 # Build Next.js
-RUN pnpm run build
+RUN npm run build
 
 # Runtime stage
 FROM node:18-alpine
@@ -20,10 +20,10 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json package-lock.json ./
 
-# Install pnpm and production dependencies only
-RUN npm install -g pnpm && pnpm install --frozen-lockfile --prod
+# Install production dependencies only
+RUN npm install --legacy-peer-deps --omit=dev
 
 # Copy built app from builder
 COPY --from=builder /app/.next ./.next

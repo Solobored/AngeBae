@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Image from "next/image"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
+import { Store } from "lucide-react"
 
 // Sample product data - in production this would come from database
 const sampleProducts = [
@@ -84,11 +85,41 @@ export default function ProductPage() {
   const [isWishlisted, setIsWishlisted] = useState(false)
 
   useEffect(() => {
-    const productId = Number.parseInt(params.id as string)
-    const foundProduct = sampleProducts.find((p) => p.id === productId)
-    setProduct(foundProduct)
+    const id = params.id as string
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+    if (isUuid) {
+      fetch(`/api/products/${id}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((p) => {
+          if (p) {
+            setProduct({
+              id: p.id,
+              name: p.name,
+              price: p.price,
+              originalPrice: p.original_price,
+              image: p.image_url,
+              description: p.description,
+              longDescription: p.description,
+              benefits: [],
+              howToUse: [],
+              ingredients: "",
+              isFlashSale: p.is_flash_sale,
+              isBestSeller: p.is_best_seller,
+              rating: undefined,
+              reviews: undefined,
+              stock: p.stock ?? 0,
+              provider_slug: p.provider_slug,
+              provider_name: p.provider_name,
+            })
+          }
+        })
+        .catch(() => {})
+    } else {
+      const productId = Number.parseInt(id, 10)
+      const foundProduct = sampleProducts.find((p) => p.id === productId)
+      setProduct(foundProduct ?? null)
+    }
 
-    // Load cart from localStorage
     const savedCart = localStorage.getItem("cart")
     if (savedCart) {
       setCart(JSON.parse(savedCart))
@@ -196,6 +227,17 @@ export default function ProductPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
               <p className="text-gray-600 text-lg">{product.description}</p>
+              {product.provider_slug && product.provider_name && (
+                <p className="mt-2">
+                  <Link
+                    href={`/store/${product.provider_slug}`}
+                    className="inline-flex items-center gap-1.5 text-sm text-pink-600 hover:underline"
+                  >
+                    <Store className="h-4 w-4" />
+                    Vendido por {product.provider_name}
+                  </Link>
+                </p>
+              )}
             </div>
 
             {/* Rating */}

@@ -332,8 +332,14 @@ export default function LearnHowToUsePage() {
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 angebae & beauty therapist. Todos los derechos reservados.</p>
+          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400 text-sm">
+            <p>
+              Desarrollado por{" "}
+              <Link href="/about/dev" className="underline hover:text-white">
+                Josvaneiba
+              </Link>
+            </p>
+            <p className="mt-1 text-gray-500">Parte de Beauty Therapist Platform</p>
           </div>
         </div>
       </footer>

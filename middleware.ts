@@ -5,9 +5,9 @@ export function middleware(request: NextRequest) {
   // Only apply middleware to admin routes (except login)
   if (request.nextUrl.pathname.startsWith("/admin") && !request.nextUrl.pathname.startsWith("/admin/login")) {
     // Check for admin authentication cookie
-    const adminAuth = request.cookies.get("admin_auth")
+    const adminAuth = request.cookies.get("admin_auth")?.value
 
-    if (!adminAuth || adminAuth.value !== "true") {
+    if (!adminAuth) {
       // Redirect to admin login if not authenticated
       return NextResponse.redirect(new URL("/admin/login", request.url))
     }

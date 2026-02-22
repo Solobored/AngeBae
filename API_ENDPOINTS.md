@@ -119,6 +119,64 @@ export const MEDIA_GET = 'GET /api/media/:id';
  */
 export const OCR_ENQUEUE = 'POST /api/ocr/enqueue';
 
+// ============================================================================
+// PROVIDER AUTH & PUBLIC
+// ============================================================================
+/**
+ * POST /api/providers/signup
+ * Registers provider owner user and provider
+ * Body: { name, email, password, contact_info? }
+ * Auth: none
+ * Sets cookie: provider_auth (httpOnly)
+ */
+export const PROVIDER_SIGNUP = 'POST /api/providers/signup';
+
+/**
+ * POST /api/providers/login
+ * Body: { email, password }
+ * Returns provider token/cookie
+ */
+export const PROVIDER_LOGIN = 'POST /api/providers/login';
+
+/**
+ * POST /api/providers/logout
+ * Clears provider_auth cookie
+ */
+export const PROVIDER_LOGOUT = 'POST /api/providers/logout';
+
+/**
+ * GET /api/providers/by-slug/:slug
+ * Public provider page data with brand_settings and featured_products
+ */
+export const PROVIDER_PUBLIC = 'GET /api/providers/by-slug/:slug';
+
+// ============================================================================
+// PROVIDER MANAGEMENT (auth: provider owner/manager or admin)
+// ============================================================================
+/**
+ * PUT /api/providers/:id/settings
+ * Update branding, theme, publish flag
+ */
+export const PROVIDER_SETTINGS = 'PUT /api/providers/:id/settings';
+
+/**
+ * POST /api/providers/:id/products
+ * Create product scoped to provider
+ */
+export const PROVIDER_CREATE_PRODUCT = 'POST /api/providers/:id/products';
+
+/**
+ * GET /api/providers/:id/product_candidates
+ * List OCR candidates for provider
+ */
+export const PROVIDER_PRODUCT_CANDIDATES = 'GET /api/providers/:id/product_candidates';
+
+/**
+ * GET /api/ocr/jobs/:id
+ * Returns OCR job status/result (provider scoped)
+ */
+export const OCR_JOB_STATUS = 'GET /api/ocr/jobs/:id';
+
 /**
  * GET /api/ocr/jobs/:id
  * Get OCR job status and results

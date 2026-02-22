@@ -2,24 +2,21 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useAdminAuth } from "./providers"
 
 export default function AdminPage() {
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { isAuthenticated, loading: authLoading, logout } = useAdminAuth()
 
   useEffect(() => {
-    // Check authentication on client side
-    const adminAuth = document.cookie.includes("admin_auth=true")
-    if (!adminAuth) {
+    if (!authLoading && !isAuthenticated) {
       router.push("/admin/login")
-    } else {
-      setLoading(false)
     }
-  }, [router])
+  }, [authLoading, isAuthenticated, router])
 
-  const handleLogout = () => {
-    // Remove authentication cookie
-    document.cookie = "admin_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+  const handleLogout = async () => {
+    await logout()
     router.push("/admin/login")
   }
 
@@ -47,7 +44,7 @@ export default function AdminPage() {
     router.push("/admin/offers")
   }
 
-  if (loading) {
+  if (authLoading || !isAuthenticated || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-lg">Cargando...</div>

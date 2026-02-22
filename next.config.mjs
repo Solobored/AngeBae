@@ -19,13 +19,6 @@ const nextConfig = {
   env: {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
   },
-
-  // ✅ move here instead of "experimental"
-  serverExternalPackages: ['@supabase/supabase-js'],
-
-  experimental: {
-    serverExternalPackages: ['@supabase/ssr', '@supabase/supabase-js'],
-  },
 };
 
 export default nextConfig;
